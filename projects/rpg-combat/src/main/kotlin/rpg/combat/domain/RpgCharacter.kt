@@ -10,7 +10,7 @@ data class Health(var value: Long) {
 	}
 
 	fun plus(heal: Long) {
-		this.value = if (value==0L) value else minOf(heal+value, MAX_HEALTH)
+		this.value = if (value == 0L) value else minOf(heal + value, MAX_HEALTH)
 	}
 
 	companion object {
@@ -20,20 +20,34 @@ data class Health(var value: Long) {
 
 data class Level(val value: Int)
 
-sealed class Category(val range: Float) {
-	object Melee: Category(range = 2f)
-	object Ranged: Category(range = 20f)
+sealed class Category {
+	object Melee : Category()
+	object Ranged : Category()
 }
 
 data class Position(val value: Int)
 
 private const val DEFAULT_LEVEL_DIFFERENCE = 5
 
+data class Faction(val name: String)
+
+data class Factions(private val _factions: MutableSet<Faction> = mutableSetOf()) : Iterable<Faction> by _factions {
+
+	fun add(faction: Faction) {
+		_factions.add(faction)
+	}
+
+	fun remove(faction: Faction) {
+		_factions.remove(faction)
+	}
+}
+
 data class RpgCharacter constructor(
 		val level: Level,
 		val health: Health,
 		val category: Category = Melee,
 		val position: Position = Position(0),
+		val factions: Factions = Factions(mutableSetOf()),
 		private val damageCalculator: DamageCalculator = DamageCalculator(DEFAULT_LEVEL_DIFFERENCE)
 ) {
 
@@ -59,6 +73,10 @@ data class RpgCharacter constructor(
 			"Character cannot damage itself!"
 		}
 
+		require(this.isAlliedWith(other).not()) {
+			"Allies cannot damage to each other!"
+		}
+
 		if (isValidRange(range)) {
 			val effectiveDamage = damageCalculator.calculateEffectiveDamage(level, other.level, damage)
 			other.health.minus(effectiveDamage)
@@ -66,11 +84,28 @@ data class RpgCharacter constructor(
 
 	}
 
-	fun heal(heal: Long) = health.plus(heal)
+	fun heal(other: RpgCharacter, heal: Long) {
+
+		require(this.isAlliedWith(other)) {
+			"Only allies can heal each other!"
+		}
+
+		health.plus(heal)
+	}
 
 	private fun isValidRange(range: Float) = when (category) {
 		is Melee -> range in 0.0..2.0
 		is Ranged -> range in 0.0..20.0
 	}
+
+	fun join(faction: Faction) {
+		factions.add(faction)
+	}
+
+	fun leave(faction: Faction) {
+		factions.remove(faction)
+	}
+
+	fun isAlliedWith(character: RpgCharacter) = factions.intersect(character.factions).isNotEmpty()
 
 }

@@ -2,18 +2,25 @@ package rpg.combat
 
 import org.junit.Test
 import rpg.combat.domain.Category.Ranged
+import rpg.combat.domain.Faction
+import rpg.combat.domain.Factions
 import rpg.combat.domain.Health
 import rpg.combat.domain.Level
 import rpg.combat.domain.RpgCharacter
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 class RpgCharacterTest {
 
 	private lateinit var character: RpgCharacter
 	private lateinit var character2: RpgCharacter
+	private lateinit var character3: RpgCharacter
+
+	private val factionOne: Faction = Faction("1")
+	private val factionTwo: Faction = Faction("2")
 
 	@Test
-	fun `Melee character creation`(){
+	fun `Melee character creation`() {
 
 		givenANewCharacter()
 
@@ -22,12 +29,82 @@ class RpgCharacterTest {
 	}
 
 	@Test
-	fun `character is damaged by Melee`() {
+	fun `character joins faction`() {
+		givenANewCharacter()
+
+		whenCharacterJoinsFaction()
+
+		thenFactionIsAddedToCharacter()
+	}
+
+	@Test
+	fun `character leaves faction`() {
+		givenANewCharacter()
+		givenTheCharacterJoinsFaction(character, factionOne)
+
+		whenCharacterLeavesFaction()
+
+		thenCharacterCompliesWithInitialStats()
+	}
+
+	@Test
+	fun `characters in same faction are allies`() {
 		givenTwoCharacters()
+		givenTheCharacterJoinsFaction(character, factionOne)
+		givenTheCharacterJoinsFaction(character2, factionOne)
+
+		// when
+
+		thenCharactersAreAllies()
+
+	}
+
+	@Test(expected = IllegalArgumentException::class)
+	fun `character is damaged by Melee from same faction`() {
+		givenTwoCharacters()
+		givenTheCharacterJoinsFaction(character, factionOne)
+		givenTheCharacterJoinsFaction(character2, factionOne)
 
 		whenFirstAttacksSecondWith(100L, 2f)
 
 		thenSecondWasDamaged()
+	}
+
+	@Test
+	fun `character is damaged by Melee from other faction`() {
+		givenTwoCharacters()
+		givenTheCharacterJoinsFaction(character, factionOne)
+		givenTheCharacterJoinsFaction(character2, factionTwo)
+
+		whenFirstAttacksSecondWith(100L, 2f)
+
+		thenSecondWasDamaged()
+	}
+
+	@Test
+	fun `character is healed by other from same faction`() {
+		givenThreeCharacters()
+		givenTheCharacterJoinsFaction(character, factionOne)
+		givenTheCharacterJoinsFaction(character2, factionOne)
+		givenTheCharacterJoinsFaction(character3, factionTwo)
+
+		whenCharacterAttacksOtherWith(character3, character2, 100, 2f)
+		whenCharacterIsHealedBy(character2, character, 100)
+
+		thenSecondsHeatlhIsMaxed()
+	}
+
+	@Test(expected = IllegalArgumentException::class)
+	fun `character is healed by other from different faction`() {
+		givenThreeCharacters()
+		givenTheCharacterJoinsFaction(character, factionOne)
+		givenTheCharacterJoinsFaction(character2, factionOne)
+		givenTheCharacterJoinsFaction(character3, factionTwo)
+
+		whenCharacterAttacksOtherWith(character3, character2, 100, 2f)
+		whenCharacterIsHealedBy(character2, character3, 100)
+
+		thenSecondsHeatlhIsMaxed()
 	}
 
 	@Test
@@ -75,35 +152,7 @@ class RpgCharacterTest {
 		thenSecondsHealthIsZero()
 	}
 
-	@Test
-	fun `character is healed`() {
-		givenTwoCharacters()
-		givenFirstAttacksSecondWith(100, 2f)
 
-		whenSecondHeals(100L)
-
-		thenSecondIsHealed()
-	}
-
-	@Test
-	fun `character overhealed`() {
-		givenTwoCharacters()
-		givenFirstAttacksSecondWith(100, 2f)
-
-		whenSecondHeals(999)
-
-		thenSecondsHeatlhIsMaxed()
-	}
-
-	@Test
-	fun `characters can't be resurrected`() {
-		givenTwoCharacters()
-		givenFirstAttacksSecondWith(1000, 2f)
-
-		whenSecondHeals(100)
-
-		thenSecondIsDead()
-	}
 
 	@Test(expected = IllegalArgumentException::class)
 	fun `characters can't commit suicide`() {
@@ -113,17 +162,33 @@ class RpgCharacterTest {
 	}
 
 	@Test
-	fun `dealing reduced damage`(){
+	fun `dealing reduced damage`() {
 		givenSecondCharacterIsFiveLevelsAhead()
 		whenFirstAttacksSecondWith(100L, range = 2f)
 		thenSecondWasDamaged(50L)
 	}
 
 	@Test
-	fun `dealing amplified damage`(){
+	fun `dealing amplified damage`() {
 		givenFirstCharacterIsFiveLevelsAhead()
 		whenFirstAttacksSecondWith(100L, 2f)
 		thenSecondWasDamaged(150L)
+	}
+
+	private fun givenTheCharacterJoinsFaction(character: RpgCharacter, faction: Faction) {
+		character.join(faction)
+	}
+
+	private fun whenCharacterLeavesFaction() {
+		character.leave(factionOne)
+	}
+
+	private fun whenCharacterJoinsFaction() {
+		character.join(Faction("1"))
+	}
+
+	private fun thenFactionIsAddedToCharacter() {
+		assertEquals(Factions(mutableSetOf(Faction("1"))), character.factions)
 	}
 
 	private fun givenSecondCharacterIsFiveLevelsAhead() {
@@ -141,6 +206,15 @@ class RpgCharacterTest {
 		character2 = RpgCharacter()
 	}
 
+	private fun givenThreeCharacters() {
+		givenTwoCharacters()
+		character3 = RpgCharacter()
+	}
+
+	private fun givenANewCharacter() {
+		character = RpgCharacter()
+	}
+
 	private fun thenNothingHappens() = assert(character.health.value == 1000L)
 
 	private fun whenCharacterAttacksItself() = character.attack(character, 10L, 2f)
@@ -149,16 +223,12 @@ class RpgCharacterTest {
 		assert(character2.health == Health(Health.MAX_HEALTH))
 	}
 
-	private fun thenSecondIsHealed() {
-		assert(character2.health == Health(Health.MAX_HEALTH))
+	private fun whenCharacterAttacksOtherWith(attacker: RpgCharacter, victim: RpgCharacter, damage: Long, range: Float) {
+		attacker.attack(victim, damage, range)
 	}
 
-	private fun whenSecondHeals(heal: Long) {
-		character2.heal(heal)
-	}
-
-	private fun givenFirstAttacksSecondWith(damage: Long, range: Float) {
-		character.attack(character2, damage, range)
+	private fun whenCharacterIsHealedBy(damagedCharacter: RpgCharacter, healer: RpgCharacter, healValue: Long) {
+		damagedCharacter.heal(healer, healValue)
 	}
 
 	private fun thenSecondsHealthIsZero() {
@@ -186,14 +256,14 @@ class RpgCharacterTest {
 	}
 
 	private fun thenCharacterCompliesWithInitialStats() {
+		assert(character.factions.toList().isEmpty())
 		assert(character.isAlive)
 		assert(character.level == Level(1))
 		assert(character.health == Health(1000L))
 	}
 
-
-
-	private fun givenANewCharacter() {
-		character = RpgCharacter()
+	private fun thenCharactersAreAllies() {
+		character.isAlliedWith(character2)
 	}
+
 }
