@@ -42,14 +42,22 @@ data class Factions(private val _factions: MutableSet<Faction> = mutableSetOf())
 	}
 }
 
+abstract class Target {
+	abstract val health: Health
+}
+
+data class Prop(override val health: Health) : Target()  {
+
+}
+
 data class RpgCharacter constructor(
 		val level: Level,
-		val health: Health,
+		override val health: Health,
 		val category: Category = Melee,
 		val position: Position = Position(0),
 		val factions: Factions = Factions(mutableSetOf()),
 		private val damageCalculator: DamageCalculator = DamageCalculator(DEFAULT_LEVEL_DIFFERENCE)
-) {
+) : Target() {
 
 	init {
 		require(health.value >= 0) {
@@ -82,6 +90,10 @@ data class RpgCharacter constructor(
 			other.health.minus(effectiveDamage)
 		}
 
+	}
+
+	fun attack(other: Target, damage: Long) {
+		other.health.minus(damage)
 	}
 
 	fun heal(other: RpgCharacter, heal: Long) {

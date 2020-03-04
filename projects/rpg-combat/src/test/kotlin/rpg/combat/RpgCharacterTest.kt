@@ -1,11 +1,13 @@
 package rpg.combat
 
+import org.hamcrest.MatcherAssert.assertThat
 import org.junit.Test
 import rpg.combat.domain.Category.Ranged
 import rpg.combat.domain.Faction
 import rpg.combat.domain.Factions
 import rpg.combat.domain.Health
 import rpg.combat.domain.Level
+import rpg.combat.domain.Prop
 import rpg.combat.domain.RpgCharacter
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,6 +17,8 @@ class RpgCharacterTest {
 	private lateinit var character: RpgCharacter
 	private lateinit var character2: RpgCharacter
 	private lateinit var character3: RpgCharacter
+
+	private lateinit var prop: Prop
 
 	private val factionOne: Faction = Faction("1")
 	private val factionTwo: Faction = Faction("2")
@@ -173,6 +177,42 @@ class RpgCharacterTest {
 		givenFirstCharacterIsFiveLevelsAhead()
 		whenFirstAttacksSecondWith(100L, 2f)
 		thenSecondWasDamaged(150L)
+	}
+
+	@Test
+	fun `prop is damaged`() {
+		givenAProp(2000L)
+		givenANewCharacter()
+		whenPropIsAttacked(1000L)
+		thenPropHealthIs(1000L)
+	}
+
+	@Test
+	fun `prop is destroyed`() {
+		givenAProp(2000L)
+		givenANewCharacter()
+		whenPropIsAttacked(2000L)
+		thenPropHealthIs(0L)
+	}
+
+	@Test
+	fun `prop is overkilled`() {
+		givenAProp(2000L)
+		givenANewCharacter()
+		whenPropIsAttacked(3000L)
+		thenPropHealthIs(0L)
+	}
+
+	private fun givenAProp(health: Long) {
+		prop = Prop(Health(health))
+	}
+
+	private fun whenPropIsAttacked(damage: Long) {
+		character.attack(prop, damage)
+	}
+
+	private fun thenPropHealthIs(health: Long) {
+		assert(prop.health.value == health)
 	}
 
 	private fun givenTheCharacterJoinsFaction(character: RpgCharacter, faction: Faction) {
